@@ -1,0 +1,326 @@
+---
+title: "Analysis of paintings in the MoMA collection"
+author: "Dmitry Panov"
+output: html_document
+---
+
+## Loading libraries and data
+
+```{r setup, messege=FALSE, warning=FALSE}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+art_df <- read.csv("artworks.csv",encoding = "UTF-8")
+```
+
+## 1. Data pre-processing 
+
+
+### 1.1. Selection of painting data and checking summary
+
+```{r paint-data, message=FALSE, warning=FALSE}
+paint_df <- art_df %>%
+  filter(Classification == "Painting") 
+summary(paint_df)
+```
+
+### 1.2. Tidying data
+
+I changed the type of some data and removed useless data for analysis: blank values, NA etc.
+
+```{r tidying-data, message=FALSE, warning=FALSE}
+paint_df_tidy <- paint_df %>%
+  separate(Acquisition.Date, c("Acquisition.Year", "Acquisition.Month","Acquisition.Day"),
+           sep = "-") %>% 
+  select(-c("Diameter..cm.", "Circumference..cm.", "Depth..cm.", "Weight..kg.",
+            "Duration..s.", "Length..cm.", "Object.Number", "Department",
+            "Dimensions", "Classification", "Catalogue", "Artwork.ID", "Artist.ID",
+            "Acquisition.Day"))
+
+paint_df_tidy[ , c(5,6)] <- apply(paint_df_tidy[ , c(5,6)], 2,
+                                  function(x) as.numeric(as.character(x)))
+
+paint_df_tidy$Acquisition.Year <- as.factor(paint_df_tidy$Acquisition.Year)
+paint_df_tidy$Acquisition.Month <- as.factor(paint_df_tidy$Acquisition.Month)
+
+paint_df_na <- na.omit(paint_df_tidy)
+paint_df_na <- paint_df_na %>% filter(Title != "" & Name != "" & Date != "" &
+                                        Medium != "" & Acquisition.Year != "" &
+                                        Acquisition.Month != "" &
+                                        Credit != "" & Height..cm. != "" &
+                                        Width..cm. != "" & Height..cm. != "0" &
+                                        Width..cm. != "0")
+```
+
+## 2. Analysis of paintings in the MoMA collection database
+
+MoMA collection database has 2270 paintings and 992 artists. After clearing the data for analysis there are are 2221 paintings and 981 artists left.
+
+### 2.1. Artists and their paintings in the MoMA collection database
+
+More than half of the artists are represented in the museum collection by one artwork — 63.6% or 624 artists. 
+
+```{r count-paint, echo=FALSE, warning=FALSE, fig.width=7, fig.height=7}
+ggplot(paint_df_na %>% 
+         group_by(Name) %>% 
+         summarise(count_art = n()) %>% 
+         arrange(count_art), aes(x=count_art, y=Name, color = as.factor(count_art),
+                                 size = count_art)) +
+  geom_point() +
+  coord_flip() +
+  theme_minimal() +
+  theme(axis.text.x=element_blank(), axis.title.x=element_blank(),
+        axis.text.y=element_text(size = 7.5),
+        plot.title = element_text(face = "bold", size = 10),
+        axis.title.y = element_text(face = "bold", size = 8),
+        legend.position = "none",
+        legend.justification = "left",
+        panel.grid.minor.y=element_blank(),
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  scale_x_continuous(breaks = c(1, 2, 3, 4, 5, 7, 6, 9, 8, 12, 10, 23, 13, 
+                                14, 15, 16, 17, 18, 19,
+                                24, 25, 30, 31, 32, 55),
+                     label = c("624","167","65", "33", "21", "16", "11", 
+                               "11", "7", "4", "3", "3", "2",
+                               "2", "2", "1", "1", "1", "1", "1",
+                               "1", "1", "1", "1", "1"),
+                     sec.axis = dup_axis(name = "Number of artwork",
+                                         label = c("1","2","3", "4", "5", "7", "6",
+                                                   "9", "8", "12", "10", "23", "13",
+                                                   "14", "15", "16", "17", "18", "19", "24",
+                                                   "25", "30", "31", "32", "55"))) +
+  ggtitle("The ratio of the number of artists to the number of artworks in the MoMA collection") +
+  xlab("Number of artists") +
+  scale_color_discrete(name="Number of paintings")
+```
+
+Only 26 artists have 10 or more artworks in the MoMA collection. This is 2.7% of all the artists in the database. Pablo Picasso has the most artworks in the museum: 55 paintings.
+
+```{r 10-paint, echo=FALSE, warning=FALSE, fig.width=10, fig.height=7}
+ggplot(paint_df_na %>% 
+         group_by(Name) %>% 
+         summarise(count_art = n()) %>% 
+         filter(count_art >= 10) %>% 
+         arrange(count_art), aes(x=reorder(Name,count_art), y=count_art,
+                                 fill=as.factor(count_art))) + 
+  scale_y_continuous(breaks = c(0, 10, 20, 30, 40, 50)) +
+  geom_bar(stat="identity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 0.8, size = 10),
+        axis.text.y=element_text(size = 10),
+        plot.title = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 10),
+        axis.title.y = element_text(face = "bold", size = 10),
+        legend.position = "bottom",
+        legend.justification = "left",
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  guides(col = guide_legend(ncol = 10)) +
+  ggtitle("Artists who have more than 10 works of artwork in the MoMA collection") +
+  xlab("Artist's name") +
+  ylab("Number of paintings") +
+  scale_fill_discrete(name="Number of paintings")
+```
+
+### 2.2. How was the collection of MoMA paintings formed
+
+In January 1930, the MoMA acquired its first paintings: "House by the Railroad" by Edward Hopper and "Seated Nude" by Bernard Karfiol. The paintings were given to the museum by Abby Aldrich Rockefeller and an unknown person.
+
+For all the time the museum was given 69.6% of paintings from the entire collection by individuals. And only 5.1% of paintings the museum purchased by itself. Partially given paintings and partially purchased — 1%.
+
+```{r who-given, echo=FALSE, warning=FALSE, fig.width=8, fig.height=5}
+credit <- paint_df_na %>% 
+  group_by(Credit) %>% 
+  summarise(count_c = n()) %>%
+  arrange(count_c)
+
+credit$method <-as.numeric(0)
+credit$method <- ifelse (grepl("partial", credit$Credit, ignore.case=TRUE)=="TRUE",
+                         "Partial Gift and Partial Purchase",
+            ifelse(grepl("Purchase", credit$Credit, ignore.case=TRUE)=="TRUE","Purchase",
+            ifelse(grepl("gift", credit$Credit, ignore.case=TRUE)=="TRUE", "Gift",
+            ifelse(grepl("given", credit$Credit, ignore.case=TRUE)=="TRUE", "Gift",
+            ifelse(grepl("generrosity", credit$Credit, ignore.case=TRUE)=="TRUE", "Gift",
+            ifelse(grepl("exchange", credit$Credit, ignore.case=TRUE)=="TRUE","Exchange",
+            ifelse(grepl("fund", credit$Credit, ignore.case=TRUE)=="TRUE","Acquired through Fund", "Other")))))))
+
+credit$method <- as.factor(credit$method)
+
+ggplot(credit %>% 
+         group_by(method) %>% 
+         summarise(count_m = n()) %>% 
+         arrange(count_m), aes(x=reorder(method,count_m), y=count_m,
+                                 fill=method)) + 
+  scale_y_continuous(breaks = c(82, 164, 246, 328, 410, 492, 574),
+                     label = c("10%", "20%", "30%", "40%", "50%", "60%", "70%")) +
+  geom_bar(stat="identity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 7),
+        axis.text.y=element_text(size = 7),
+        plot.title = element_text(face = "bold", size = 10),
+        axis.title.x = element_text(face = "bold", size = 8),
+        axis.title.y = element_text(face = "bold", size = 8),
+        legend.position = "none",
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  ggtitle("The ratio of acquisition of paintings to method of acquisition") +
+  ylab("Percentage of acquisition") +
+  xlab("Method of acquisition")
+```
+
+The museum acquired the most artwork in 1985 — 86 paintings. 
+
+```{r acquisition, echo=FALSE, warning=FALSE, fig.width=8, fig.height=4}
+ggplot(paint_df_na %>% 
+         group_by(Acquisition.Year) %>% 
+         summarise(count_art = n()) %>% 
+         filter(count_art >= 50) %>% 
+         arrange(Acquisition.Year), aes(x=Acquisition.Year, y=count_art,
+                                 fill=Acquisition.Year)) + 
+  scale_y_continuous(breaks = c(0, 50, 60, 70, 80, 90)) +
+  geom_bar(stat="identity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 0.4, size = 7),
+        axis.text.y=element_text(size = 7),
+        plot.title = element_text(face = "bold", size = 10),
+        axis.title.x = element_text(face = "bold", size = 8),
+        axis.title.y = element_text(face = "bold", size = 8),
+        legend.position = "none",
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  ggtitle("The years when MoMA acquired over 50 paintings") +
+  xlab("Year of acquisition") +
+  ylab("Number of acquired paintings")
+```
+
+## 3. Comparison of artworks by Pablo Picasso and Henri Matisse in the MoMA collection database
+
+For the analysis were selected artists P. Picasso and H. Matisse, because these artists have a large number of works in the dataset of the museum's collection (55 and 31), and because the artists were friends and rivals who influenced each other very much.
+
+```{r pablo-henri-count, echo=FALSE, warning=FALSE, fig.width=8, fig.height=5}
+pablo_and_henri <- paint_df_na %>% 
+  filter(Name == "Pablo Picasso" | Name == "Henri Matisse")
+
+ggplot(pablo_and_henri %>% 
+         group_by(Name) %>% 
+         summarise(count_art = n()) %>% 
+         arrange(Name), aes(x=Name, y=count_art, fill=Name)) + 
+  geom_bar(stat="identity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 0.8, size = 7),
+        axis.text.y=element_text(size = 7),
+        plot.title = element_text(face = "bold", size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(face = "bold", size = 8),
+        legend.position = "bottom",
+        legend.justification = "left",
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  guides(col = guide_legend(ncol = 10)) +
+  ggtitle("Comparison of the acquisition of paintings by P. Picasso and H. Matisse") +
+  ylab("Number of paintings") +
+  scale_fill_discrete(name="Artist's name")
+```
+
+```{r pablo-henri-ac-year, echo=FALSE, warning=FALSE, fig.width=12, fig.height=5}
+ggplot(pablo_and_henri %>% 
+         group_by(Name, Acquisition.Year) %>% 
+         summarise(count_art = n()) %>% 
+         arrange(Acquisition.Year), aes(x=Acquisition.Year, y=count_art, fill=Name)) + 
+  geom_bar(stat="identity") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 0.8, size = 8),
+        axis.text.y=element_text(size = 8),
+        plot.title = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 10),
+        axis.title.y = element_text(face = "bold", size = 10),
+        legend.position = "bottom",
+        legend.justification = "left",
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  guides(col = guide_legend(ncol = 10)) +
+  ggtitle("When MoMA acquired of paintings by P. Picasso and H. Matisse") +
+  xlab("Year of acquisition") +
+  ylab("Number of acquired paintings") +
+  scale_fill_discrete(name="Artist's name")
+```
+
+The largest number of paintings by two artists are "oil on canvas": P.Picasso - 40 paintings, H.Matisse - 21 paintings.
+
+```{r pablo-henri-medium-1, echo=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+ggplot(pablo_and_henri %>% 
+         group_by(Name, Medium) %>% 
+         summarise(count_art = n()), aes(x=Medium, y=count_art, fill=Name)) + 
+  geom_bar(stat="identity", position = "dodge") +
+  coord_flip() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 0.95, size = 8),
+        axis.text.y=element_text(size = 8),
+        plot.title = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 10),
+        axis.title.y = element_text(face = "bold", size = 10),
+        legend.position = "bottom",
+        legend.justification = "left",
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  guides(col = guide_legend(ncol = 10)) +
+  ggtitle("The number of paintings by P. Picasso and H. Matisse of different medium") +
+  xlab("Medium of paintings") +
+  ylab("Number of paintings") +
+  scale_fill_discrete(name="Artist's name")
+```
+
+The largest number of paintings by two artists painted "Oil on canvas": P.Picasso - 40 paintings, H.Matisse - 21 paintings. And to better study the medium used by the artists, the category "Oil on Canvas" was excluded from the analysis.
+
+On the graphics you can see that the artists (except "Oil on Canvas") most often worked in different mediums. And there is only one medium that they have the same. It is "Oil and charcoal on canvas".
+
+```{r pablo-henri-medium-2, echo=FALSE, warning=FALSE, fig.width=12, fig.height=8}
+ggplot(pablo_and_henri %>% 
+         group_by(Name, Medium) %>% 
+         summarise(count_art = n()) %>% 
+         filter(Medium != "Oil on canvas"), aes(x=Medium, y=count_art, fill=Name)) + 
+  geom_bar(stat="identity", position = "dodge") +
+  coord_flip() +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 0.95, size = 8),
+        axis.text.y=element_text(size = 8),
+        plot.title = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 10),
+        axis.title.y = element_text(face = "bold", size = 10),
+        legend.position = "bottom",
+        legend.justification = "left",
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.x=element_blank()) +
+  guides(col = guide_legend(ncol = 10)) +
+  ggtitle('The number of paintings by P. Picasso and H. Matisse of different medium
+  (without "Oil on canvas")') +
+  xlab("Medium of paintings") +
+  ylab("Number of paintings") +
+  scale_fill_discrete(name="Artist's name")
+```
+
+In the chart below you can see that most of the works in the collection are square. We can also see that H. Matisse created large paintings more often than P. Picasso (according to data from the MOMA collection dataset).
+
+```{r pablo-henri-size-paint, echo=FALSE, warning=FALSE, fig.width=11, fig.height=7}
+ggplot(pablo_and_henri %>% 
+         group_by(Name, Height..cm., Width..cm.), 
+         aes(x=Width..cm., y=Height..cm., color=Name, size=Height..cm.*Width..cm.)) + 
+  geom_point(shape = 15, alpha = 0.7) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 0.8, size = 8),
+        axis.text.y=element_text(size = 8),
+        plot.title = element_text(face = "bold", size = 12),
+        axis.title.x = element_text(face = "bold", size = 10),
+        axis.title.y = element_text(face = "bold", size = 10),
+        legend.position = "bottom",
+        legend.justification = "left") +
+  guides(col = guide_legend(ncol = 10)) +
+  ggtitle("The size of paintings by P. Picasso and H. Matisse") +
+  xlab("Width of picture, cm") +
+  ylab("Height of picture, cm") +
+  scale_color_discrete(name="Artist's name") +
+  scale_x_continuous(breaks = c(0, 100, 200, 300, 400, 500, 600, 700, 800))
+```
+
+
